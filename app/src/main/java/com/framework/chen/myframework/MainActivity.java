@@ -10,10 +10,15 @@ import com.google.gson.GsonBuilder;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Retrofit;
+import retrofit2.adapter.rxjava.RxJavaCallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
 import retrofit2.http.GET;
-import retrofit2.http.Path;
 import retrofit2.Response;
+import rx.Observable;
+import rx.Subscriber;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.schedulers.Schedulers;
+
 public class MainActivity extends AppCompatActivity {
 
     @Override
@@ -23,9 +28,9 @@ public class MainActivity extends AppCompatActivity {
         requestNet();
     }
 
-    public interface BlogService {
+    public interface VideoInfoService {
         @GET("attendance/getAllLocation")
-        Call<VideoInfo> getBlog();
+        Observable<VideoInfo> getBlog();
     }
 
     public void requestNet() {
@@ -38,23 +43,30 @@ public class MainActivity extends AppCompatActivity {
                 .baseUrl("http://amidgame.cn/api/")
                 //可以接收自定义的Gson，当然也可以不传
                 .addConverterFactory(GsonConverterFactory.create(gson))
+                .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
                 .build();
 
 
-        BlogService service = retrofit.create(BlogService.class);
-        Call<VideoInfo> call = service.getBlog();
-        call.enqueue(new Callback<VideoInfo>() {
-            @Override
-            public void onResponse(Call<VideoInfo> call, Response<VideoInfo> response) {
-                // 已经转换为想要的类型了
-                VideoInfo result = response.body();
-                System.out.println(result.toString());
-            }
+        VideoInfoService service = retrofit.create(VideoInfoService.class);
+        service.getBlog().subscribeOn(Schedulers.io())
+                .unsubscribeOn(Schedulers.io())
+                .subscribeOn(AndroidSchedulers.mainThread())
+                .observeOn(AndroidSchedulers.mainThread()).subscribe(new Subscriber<VideoInfo>() {
+                @Override
+                public void onCompleted() {
+                    System.out.println("onCompleted");
+                }
 
-            @Override
-            public void onFailure(Call<VideoInfo> call, Throwable t) {
-                t.printStackTrace();
-            }
-        });
+                @Override
+                public void onError(Throwable e) {
+                    System.err.println("onError:" + e.getMessage());
+                }
+
+                @Override
+                public void onNext(VideoInfo blogsResult) {
+                    System.out.println(blogsResult.toString());
+                }
+         });
+
     }
 }
