@@ -2,20 +2,17 @@ package com.framework.chen.myframework.api;
 
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
+import android.util.Log;
 
-import com.dl7.mvp.AndroidApplication;
-import com.dl7.mvp.api.bean.NewsDetailInfo;
-import com.dl7.mvp.api.bean.NewsInfo;
-import com.dl7.mvp.api.bean.PhotoInfo;
-import com.dl7.mvp.api.bean.PhotoSetInfo;
-import com.dl7.mvp.api.bean.SpecialInfo;
-import com.dl7.mvp.api.bean.WelfarePhotoInfo;
-import com.dl7.mvp.api.bean.WelfarePhotoList;
-import com.dl7.mvp.local.table.BeautyPhotoInfo;
-import com.dl7.mvp.local.table.VideoInfo;
-import com.dl7.mvp.utils.NetUtil;
-import com.dl7.mvp.utils.StringUtils;
-import com.orhanobut.logger.Logger;
+
+import com.framework.chen.myframework.MyApplication;
+import com.framework.chen.myframework.api.bean.NewsDetailInfo;
+import com.framework.chen.myframework.api.bean.NewsInfo;
+import com.framework.chen.myframework.api.bean.PhotoInfo;
+import com.framework.chen.myframework.api.bean.PhotoSetInfo;
+import com.framework.chen.myframework.api.bean.SpecialInfo;
+import com.framework.chen.myframework.utils.NetUtil;
+import com.framework.chen.myframework.utils.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,6 +43,7 @@ import rx.schedulers.Schedulers;
  * 整个网络通信服务的启动控制，必须先调用初始化函数才能正常使用网络通信接口
  */
 public class RetrofitService {
+    private static final String TAG = "RetrofitService";
 
     private static final String HEAD_LINE_NEWS = "T1348647909107";
 
@@ -77,7 +75,7 @@ public class RetrofitService {
      */
     public static void init() {
         // 指定缓存路径,缓存大小100Mb
-        Cache cache = new Cache(new File(AndroidApplication.getContext().getCacheDir(), "HttpCache"),
+        Cache cache = new Cache(new File(MyApplication.getContext().getCacheDir(), "HttpCache"),
                 1024 * 1024 * 100);
         OkHttpClient okHttpClient = new OkHttpClient.Builder().cache(cache)
                 .retryOnConnectionFailure(true)
@@ -113,13 +111,13 @@ public class RetrofitService {
         @Override
         public Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
-            if (!NetUtil.isNetworkAvailable(AndroidApplication.getContext())) {
+            if (!NetUtil.isNetworkAvailable(MyApplication.getContext())) {
                 request = request.newBuilder().cacheControl(CacheControl.FORCE_CACHE).build();
-                Logger.e("no network");
+                Log.e(TAG,"no network");
             }
             Response originalResponse = chain.proceed(request);
 
-            if (NetUtil.isNetworkAvailable(AndroidApplication.getContext())) {
+            if (NetUtil.isNetworkAvailable(MyApplication.getContext())) {
                 //有网的时候读接口上的@Headers里的配置，你可以在这里进行统一的设置
                 String cacheControl = request.cacheControl().toString();
                 return originalResponse.newBuilder()
@@ -147,10 +145,10 @@ public class RetrofitService {
             if (request.body() != null) {
                 request.body().writeTo(requestBuffer);
             } else {
-                Logger.d("LogTAG", "request.body() == null");
+                Log.d("LogTAG", "request.body() == null");
             }
             //打印url信息
-            Logger.w(request.url() + (request.body() != null ? "?" + _parseParams(request.body(), requestBuffer) : ""));
+            Log.w(TAG,request.url() + (request.body() != null ? "?" + _parseParams(request.body(), requestBuffer) : ""));
             final Response response = chain.proceed(request);
 
             return response;
@@ -186,19 +184,7 @@ public class RetrofitService {
                 .flatMap(_flatMapNews(newsId));
     }
 
-    /**
-     * 获取专题数据
-     * @param specialId
-     * @return
-     */
-    public static Observable<SpecialInfo> getSpecial(String specialId) {
-        return sNewsService.getSpecial(specialId)
-                .subscribeOn(Schedulers.io())
-                .unsubscribeOn(Schedulers.io())
-                .subscribeOn(AndroidSchedulers.mainThread())
-                .observeOn(AndroidSchedulers.mainThread())
-                .flatMap(_flatMapSpecial(specialId));
-    }
+
 
     /**
      * 获取新闻详情
@@ -256,45 +242,7 @@ public class RetrofitService {
                 .observeOn(AndroidSchedulers.mainThread());
     }
 
-    /**
-     * 获取美女图片
-     * 注: 因为网易这个原接口参数一大堆，我只传了部分参数，返回的数据会出现图片重复的情况，请不要在意这个问题- -
-     * @return
-     */
-    public static Observable<List<BeautyPhotoInfo>> getBeautyPhoto(int page) {
-        return sNewsService.getBeautyPhoto(page * INCREASE_PAGE)
-                .subscribeOn(Schedulers.io())
-                .unsubscribeOn(Schedulers.io())
-                .subscribeOn(AndroidSchedulers.mainThread())
-                .observeOn(AndroidSchedulers.mainThread())
-                .flatMap(_flatMapPhotos());
-    }
 
-    /**
-     * 获取福利图片
-     * @return
-     */
-    public static Observable<WelfarePhotoInfo> getWelfarePhoto(int page) {
-        return sWelfareService.getWelfarePhoto(page)
-                .subscribeOn(Schedulers.io())
-                .unsubscribeOn(Schedulers.io())
-                .subscribeOn(AndroidSchedulers.mainThread())
-                .observeOn(AndroidSchedulers.mainThread())
-                .flatMap(_flatMapWelfarePhotos());
-    }
-
-    /**
-     * 获取视频列表
-     * @return
-     */
-    public static Observable<List<VideoInfo>> getVideoList(String videoId, int page) {
-        return sNewsService.getVideoList(videoId, page * INCREASE_PAGE / 2)
-                .subscribeOn(Schedulers.io())
-                .unsubscribeOn(Schedulers.io())
-                .subscribeOn(AndroidSchedulers.mainThread())
-                .observeOn(AndroidSchedulers.mainThread())
-                .flatMap(_flatMapVideo(videoId));
-    }
 
     /******************************************* 转换器 **********************************************/
 
@@ -343,60 +291,4 @@ public class RetrofitService {
         };
     }
 
-    /**
-     * 类型转换
-     * @param typeStr 视频类型
-     * @return
-     */
-    private static Func1<Map<String, List<VideoInfo>>, Observable<List<VideoInfo>>> _flatMapVideo(final String typeStr) {
-        return new Func1<Map<String, List<VideoInfo>>, Observable<List<VideoInfo>>>() {
-            @Override
-            public Observable<List<VideoInfo>> call(Map<String, List<VideoInfo>> newsListMap) {
-                return Observable.just(newsListMap.get(typeStr));
-            }
-        };
-    }
-
-    /**
-     * 类型转换
-     * @param specialId 专题id
-     * @return
-     */
-    private static Func1<Map<String, SpecialInfo>, Observable<SpecialInfo>> _flatMapSpecial(final String specialId) {
-        return new Func1<Map<String, SpecialInfo>, Observable<SpecialInfo>>() {
-            @Override
-            public Observable<SpecialInfo> call(Map<String, SpecialInfo> specialMap) {
-                return Observable.just(specialMap.get(specialId));
-            }
-        };
-    }
-
-    /**
-     * 类型转换
-     * @return
-     */
-    private static Func1<Map<String, List<BeautyPhotoInfo>>, Observable<List<BeautyPhotoInfo>>> _flatMapPhotos() {
-        return new Func1<Map<String, List<BeautyPhotoInfo>>, Observable<List<BeautyPhotoInfo>>>() {
-            @Override
-            public Observable<List<BeautyPhotoInfo>> call(Map<String, List<BeautyPhotoInfo>> newsListMap) {
-                return Observable.just(newsListMap.get("美女"));
-            }
-        };
-    }
-
-    /**
-     * 类型转换
-     * @return
-     */
-    private static Func1<WelfarePhotoList, Observable<WelfarePhotoInfo>> _flatMapWelfarePhotos() {
-        return new Func1<WelfarePhotoList, Observable<WelfarePhotoInfo>>() {
-            @Override
-            public Observable<WelfarePhotoInfo> call(WelfarePhotoList welfarePhotoList) {
-                if (welfarePhotoList.getResults().size() == 0) {
-                    return Observable.empty();
-                }
-                return Observable.from(welfarePhotoList.getResults());
-            }
-        };
-    }
 }

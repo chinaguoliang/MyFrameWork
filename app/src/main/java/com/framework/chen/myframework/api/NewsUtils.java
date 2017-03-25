@@ -2,7 +2,6 @@ package com.framework.chen.myframework.api;
 
 import android.support.annotation.NonNull;
 
-import com.dl7.mvp.api.bean.NewsInfo;
 
 /**
  * Created by Rukey7 on 2016/8/22.
@@ -27,16 +26,6 @@ public final class NewsUtils {
     private static final String NEWS_ITEM_PHOTO_SET = "photoset";
 
 
-    /**
-     * 判断是否为广告
-     *
-     * @param newsBean
-     * @return
-     */
-    public static boolean isAbNews(@NonNull NewsInfo newsBean) {
-        return (newsBean.getHasHead() == HAS_HEAD &&
-                newsBean.getAds() != null && newsBean.getAds().size() > 1);
-    }
 
     /**
      * 从超链接中取出新闻ID
